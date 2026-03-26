@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WCAG Accessibility Audit Skill for Claude</title>
+<meta name="description" content="A Claude skill for automated WCAG 2.1 AA accessibility audits of government websites. A personal project by Brendan Babb.">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#091F2F;--bg-card:#0D2940;--bg-card-hover:#112F4A;
+  --text:#C8D6E0;--text-muted:#7A99B0;--text-white:#F0F4F7;
+  --accent:#4A90D9;--accent-light:#6BAAEF;
+  --gold:#E8A838;--green:#3CB371;--red:#E05252;--amber:#E8A838;
+  --radius:10px;--max-w:1200px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--accent-light);text-decoration:none;transition:color .2s}
+a:hover{color:var(--text-white)}
+.container{max-width:var(--max-w);margin:0 auto;padding:0 2rem}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(9,31,47,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(74,144,217,.12);padding:.75rem 0}
+nav .container{display:flex;align-items:center;justify-content:space-between}
+.nav-brand{font-weight:700;font-size:1rem;color:var(--text-white);display:flex;align-items:center;gap:.5rem}
+.nav-brand::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.nav-links{display:flex;gap:2rem;list-style:none}
+.nav-links a{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
+.nav-links a:hover{color:var(--text-white)}
+
+section{padding:6rem 0}
+.section-label{display:flex;align-items:center;gap:1rem;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:1.5rem;font-weight:500}
+.section-label::before{content:'';display:inline-block;width:40px;height:2px;background:var(--accent)}
+h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:700;color:var(--text-white);line-height:1.1;margin-bottom:1.5rem}
+h1 em{color:var(--accent);font-style:italic}
+h2{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:700;color:var(--text-white);line-height:1.15;margin-bottom:1rem}
+h3{font-size:1.15rem;font-weight:700;color:var(--text-white);margin-bottom:.5rem}
+.subtitle{font-size:1.1rem;color:var(--text);max-width:680px;margin-bottom:2.5rem;line-height:1.8}
+
+.hero{padding:10rem 0 5rem}
+.btn-row{display:flex;gap:1rem;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.75rem;border-radius:var(--radius);font-weight:600;font-size:.95rem;transition:all .2s}
+.btn-primary{background:var(--accent);color:var(--text-white)}
+.btn-primary:hover{background:var(--accent-light);color:var(--text-white)}
+.btn-outline{background:transparent;border:1px solid rgba(200,214,224,.25);color:var(--text-white)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:2rem;padding:3rem 0;border-top:1px solid rgba(200,214,224,.08);border-bottom:1px solid rgba(200,214,224,.08);margin-top:4rem}
+.stat-num{font-size:2.2rem;font-weight:700;color:var(--text-white)}
+.stat-label{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-top:.25rem}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5rem;margin-top:2rem}
+.card{background:var(--bg-card);border:1px solid rgba(74,144,217,.1);border-radius:var(--radius);padding:1.75rem;transition:border-color .2s,transform .2s}
+.card:hover{border-color:rgba(74,144,217,.3);transform:translateY(-2px)}
+.card-phase{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.card-output{margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(200,214,224,.08);font-size:.9rem}
+.card-output strong{color:var(--gold)}
+
+.sev-crit{background:rgba(224,82,82,.12);color:#F08080;border:1px solid rgba(224,82,82,.2)}
+.sev-ser{background:rgba(232,168,56,.12);color:#E8A838;border:1px solid rgba(232,168,56,.2)}
+.sev-mod{background:rgba(74,144,217,.12);color:#6BAAEF;border:1px solid rgba(74,144,217,.2)}
+.badge{display:inline-block;font-size:.7rem;padding:.15rem .6rem;border-radius:6px;font-weight:600;letter-spacing:.02em}
+
+.mode-card{position:relative;overflow:hidden}
+.mode-card::before{content:attr(data-num);position:absolute;top:-10px;right:12px;font-size:5rem;font-weight:700;color:rgba(74,144,217,.06);line-height:1}
+
+.setup-steps{counter-reset:step}
+.step{display:flex;gap:1.5rem;margin-bottom:2rem;align-items:flex-start}
+.step-num{font-size:1.6rem;font-weight:700;color:var(--accent);min-width:2rem}
+.step h4{font-size:1rem;font-weight:600;color:var(--text-white);margin-bottom:.25rem}
+.step p{font-size:.9rem;color:var(--text-muted)}
+
+.code-block{background:var(--bg-card);border:1px solid rgba(74,144,217,.15);border-radius:var(--radius);padding:1.5rem;font-family:'DM Mono',monospace;font-size:.85rem;color:var(--text);line-height:1.6;overflow-x:auto;white-space:pre-wrap}
+.code-block .comment{color:var(--text-muted)}
+.code-block .prompt{color:var(--gold)}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:start}
+
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-top:2rem}
+.principle{padding-top:1rem;border-top:2px solid var(--accent)}
+.principle h3{font-size:1rem}
+.principle p{font-size:.9rem;color:var(--text-muted);margin-top:.5rem}
+
+.divider{border:0;border-top:1px solid rgba(200,214,224,.08);margin:0}
+
+footer{padding:3rem 0;border-top:1px solid rgba(200,214,224,.08)}
+footer .container{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
+.footer-brand{font-weight:700;color:var(--accent-light);display:flex;align-items:center;gap:.5rem}
+.footer-brand::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.footer-links{display:flex;gap:1.5rem;list-style:none;font-size:.85rem}
+.footer-links a{color:var(--text-muted)}
+.footer-credit{font-size:.8rem;color:var(--text-muted);width:100%;text-align:left;margin-top:.5rem}
+
+@media(max-width:768px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .split{grid-template-columns:1fr}
+  .nav-links{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="container">
+  <a href="#" class="nav-brand">WCAG Audit</a>
+  <ul class="nav-links">
+    <li><a href="#modes">Modes</a></li>
+    <li><a href="#methodology">Methodology</a></li>
+    <li><a href="#quickstart">Quickstart</a></li>
+    <li><a href="https://github.com/brendanbabb/wcag-audit-skill">GitHub ↗</a></li>
+  </ul>
+</div>
+</nav>
+
+<section class="hero">
+<div class="container">
+  <div class="section-label">Claude AI · Accessibility · Government Websites</div>
+  <h1>WCAG Audit<br><em>Skill for</em><br>Claude</h1>
+  <p class="subtitle">Automated WCAG 2.1 AA accessibility audits for government websites using three complementary data sources — axe-core, Chrome accessibility tree, and manual DOM inspection. A personal project by Brendan Babb.</p>
+  <div class="btn-row">
+    <a href="https://github.com/brendanbabb/wcag-audit-skill" class="btn btn-primary">View on GitHub ↗</a>
+    <a href="#quickstart" class="btn btn-outline">Get started</a>
+  </div>
+  <div class="stats">
+    <div><div class="stat-num">4</div><div class="stat-label">Audit modes</div></div>
+    <div><div class="stat-num">3</div><div class="stat-label">Data sources</div></div>
+    <div><div class="stat-num">2</div><div class="stat-label">Reference files</div></div>
+    <div><div class="stat-num">14</div><div class="stat-label">Tool calls (5-page batch)</div></div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section id="modes">
+<div class="container">
+  <div class="section-label">Four audit modes</div>
+  <h2>Scan. Batch. Compare. Track.</h2>
+  <p class="subtitle">From a single-page deep dive to site-wide compliance tracking, each mode is optimized for tool call efficiency.</p>
+  <div class="cards">
+    <div class="card mode-card" data-num="01">
+      <div class="card-phase">01 — Single page</div>
+      <h3>Deep audit</h3>
+      <p>Full 3-source audit of one URL. Accessibility tree analysis reveals what axe-core misses — unlabeled navs, heading misuse, phantom focusable elements, structural issues.</p>
+      <div class="card-output"><strong>Key output:</strong> Interactive dashboard with severity-filtered issue cards, element-level detail from the a11y tree, and specific fix suggestions.</div>
+    </div>
+    <div class="card mode-card" data-num="02">
+      <div class="card-phase">02 — Batch crawl</div>
+      <h3>Site scorecard</h3>
+      <p>Audit 5–10 pages in one run. Uses the combined audit script — ONE tool call per page after navigation. Identifies template-level vs page-specific issues automatically.</p>
+      <div class="card-output"><strong>Key output:</strong> Rolled-up scorecard with per-page scores, template-level issue cards, and a horizontal bar chart sorted by score.</div>
+    </div>
+    <div class="card mode-card" data-num="03">
+      <div class="card-phase">03 — Before/after diff</div>
+      <h3>Remediation progress</h3>
+      <p>Compare two audit runs to measure what was fixed. Shows resolved, new, persisting, and improved issues with score delta. Generates leadership-ready narrative summaries.</p>
+      <div class="card-output"><strong>Key output:</strong> Progress report showing "7 of 19 issues resolved, score improved 58 → 78" — ready to paste into an email.</div>
+    </div>
+    <div class="card mode-card" data-num="04">
+      <div class="card-phase">04 — Tracking spreadsheet</div>
+      <h3>XLSX export</h3>
+      <p>Export any audit to a structured spreadsheet with score summary, all issues, template-level issues, and audit metadata. Designed for longitudinal tracking and team handoff.</p>
+      <div class="card-output"><strong>Key output:</strong> 4-sheet XLSX with conditional formatting, ready for leadership reporting and compliance tracking.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section id="methodology">
+<div class="container">
+  <div class="section-label">Three data sources</div>
+  <h2>axe-core. Accessibility tree. Manual inspection.</h2>
+  <p class="subtitle">Each source catches issues the others miss. Single-page mode uses all three; batch mode uses axe-core + manual checks for efficiency.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="card-phase">Automated scan</div>
+      <h3>axe-core 4.8.4</h3>
+      <p>Industry-standard accessibility engine injected into the live page. Tests against WCAG 2.0 A/AA, WCAG 2.1 A/AA, and best-practice rules. Catches color contrast, missing labels, ARIA misuse, list structure violations.</p>
+      <div class="card-output"><strong>Catches:</strong> Color contrast ratios, form label associations, ARIA attribute validation, list structure, link purpose.</div>
+    </div>
+    <div class="card">
+      <div class="card-phase">Structural analysis</div>
+      <h3>Chrome accessibility tree</h3>
+      <p>The browser's accessibility tree represents what assistive technology actually sees. Reveals heading hierarchy gaps, unlabeled navigation regions, phantom focusable elements, and structural issues invisible to automated scans.</p>
+      <div class="card-output"><strong>Catches:</strong> 247-element Google Translate widget noise, zero-width-space ghost links, heading misuse (hours styled as H5), unlabeled nav identification.</div>
+    </div>
+    <div class="card">
+      <div class="card-phase">DOM inspection</div>
+      <h3>Manual checks</h3>
+      <p>JavaScript checks for things neither axe-core nor the a11y tree surface cleanly: skip links, lang attributes, images without alt (vs empty alt), external links opening new tabs without warnings, positive tabindex.</p>
+      <div class="card-output"><strong>Catches:</strong> Skip link presence, lang attribute, alt vs empty alt distinction, target="_blank" without warnings, tabindex disruptions.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section>
+<div class="container">
+  <div class="section-label">Efficiency</div>
+  <h2>Built for tool call budgets</h2>
+  <p class="subtitle">Every Claude in Chrome tool call counts against a per-conversation limit. This skill is designed to maximize audit coverage within those constraints.</p>
+  <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card" style="text-align:center">
+      <div class="stat-num" style="color:var(--green)">4</div>
+      <div class="stat-label">Tool calls — single page</div>
+      <p style="margin-top:.75rem;font-size:.85rem">Full 3-source audit including accessibility tree</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="stat-num" style="color:var(--green)">14</div>
+      <div class="stat-label">Tool calls — 5-page batch</div>
+      <p style="margin-top:.75rem;font-size:.85rem">Combined audit script: 1 JS call per page</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="stat-num" style="color:var(--green)">23</div>
+      <div class="stat-label">Tool calls — 10-page batch</div>
+      <p style="margin-top:.75rem;font-size:.85rem">Hard cap. Suggest follow-up batches beyond 10</p>
+    </div>
+  </div>
+  <div style="margin-top:2rem;padding:1.5rem;background:var(--bg-card);border-radius:var(--radius);border-left:3px solid var(--gold);border-top:0;border-right:0;border-bottom:0">
+    <p style="color:var(--gold);font-weight:600;margin-bottom:.5rem">Key innovation: Combined audit script</p>
+    <p style="font-size:.9rem">One <code style="color:var(--accent-light)">javascript_tool</code> call loads axe-core, waits for it, runs the WCAG scan, executes all manual DOM checks, and returns combined JSON results. This replaces the 4–5 separate tool calls per page that the original version required.</p>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section>
+<div class="container">
+  <div class="section-label">Platform awareness</div>
+  <h2>SharePoint-ready</h2>
+  <p class="subtitle">Built and tested on SharePoint 2013/2016/2019 government sites. The skill understands common SharePoint patterns and filters noise from real issues.</p>
+  <div class="cards" style="grid-template-columns:repeat(2,1fr)">
+    <div class="card">
+      <h3>Template-level detection</h3>
+      <p>Automatically identifies issues that appear on 80%+ of pages — master page fixes that improve every page at once. Separates them from page-specific content issues in the report.</p>
+    </div>
+    <div class="card">
+      <h3>SharePoint noise filtering</h3>
+      <p>Recognizes empty web part zones (PageContent2-11), Google Translate widget clutter (247 generic elements), aria-labelledby on divs with no ARIA role, and other SharePoint artifacts.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section id="quickstart">
+<div class="container">
+  <div class="section-label">Get started</div>
+  <h2>Start auditing in three steps</h2>
+  <div class="split" style="margin-top:3rem">
+    <div>
+      <div class="section-label" style="font-size:.7rem">Setup</div>
+      <div class="step"><div class="step-num">1</div><div><h4>Download the skill files</h4><p>Get SKILL.md, references/axe-core-scripts.md, and references/wcag-quick-ref.md from GitHub.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div><h4>Upload to Claude</h4><p>Add the skill to your Claude.ai environment via Settings → Features → Skills. Or copy the directory into your Claude Code skill folder.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div><h4>Connect Claude in Chrome</h4><p>Install the Claude in Chrome extension for full 3-source audits. Without it, the skill falls back to partial audits via web_fetch.</p></div></div>
+    </div>
+    <div>
+      <div class="section-label" style="font-size:.7rem">Example prompts</div>
+      <div class="code-block"><span class="comment"># Single-page deep dive</span>
+<span class="prompt">"Audit https://www.baltimorecity.gov/ for WCAG accessibility"</span>
+
+<span class="comment"># Batch audit a section</span>
+<span class="prompt">"Run a batch WCAG audit on the top 5 pages of baltimorecity.gov"</span>
+
+<span class="comment"># Before/after comparison</span>
+<span class="prompt">"Re-audit the Baltimore homepage and compare to the baseline — did our fixes work?"</span>
+
+<span class="comment"># Export for leadership</span>
+<span class="prompt">"Export the audit results to a tracking spreadsheet I can share with the web team"</span></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section>
+<div class="container">
+  <div class="section-label">Skill files</div>
+  <h2>What's in the repo</h2>
+  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+    <div class="card"><h3>SKILL.md</h3><p>The core skill file. Defines all 4 audit modes, tool call budgets, scoring formula, batch workflow, and Visualizer report templates.</p></div>
+    <div class="card"><h3>axe-core-scripts.md</h3><p>Ready-to-use JavaScript snippets: the combined batch audit script, quick scan script, violation detail extraction, color contrast extraction.</p></div>
+    <div class="card"><h3>wcag-quick-ref.md</h3><p>Concise mapping of the most commonly violated WCAG criteria, their requirements, and typical fix patterns for government sites.</p></div>
+  </div>
+</div>
+</section>
+
+<hr class="divider">
+
+<section>
+<div class="container">
+  <div class="section-label">Design principles</div>
+  <h2>Built for real government work</h2>
+  <div class="principles">
+    <div class="principle"><h3>Efficient</h3><p>Every audit mode is designed around tool call budgets. Combined scripts, no wasted wait calls, optional depth levels for different page counts.</p></div>
+    <div class="principle"><h3>Actionable</h3><p>Every issue includes a specific fix suggestion — actual code changes, not vague advice. Template vs page scope identified so teams know where to fix.</p></div>
+    <div class="principle"><h3>Multi-source</h3><p>Three complementary audit sources catch different classes of issues. Multi-source findings are flagged as higher confidence.</p></div>
+    <div class="principle"><h3>Transparent</h3><p>Every report notes methodology limitations. Automated tools catch 30-40% of WCAG issues — the skill says so, every time.</p></div>
+    <div class="principle"><h3>Shareable</h3><p>XLSX exports, Visualizer dashboards, and leadership-ready narrative summaries. Built for teams, not just the person running the audit.</p></div>
+  </div>
+</div>
+</section>
+
+<footer>
+<div class="container">
+  <div class="footer-brand">WCAG Audit Skill</div>
+  <ul class="footer-links">
+    <li><a href="https://github.com/brendanbabb/wcag-audit-skill">GitHub</a></li>
+    <li><a href="https://www.w3.org/WAI/WCAG21/quickref/">WCAG 2.1</a></li>
+    <li><a href="https://github.com/dequelabs/axe-core">axe-core</a></li>
+  </ul>
+  <div class="footer-credit">A personal project by Brendan Babb · Built with Claude · Open source · MIT License</div>
+</div>
+</footer>
+
+</body>
+</html>
